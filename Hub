@@ -1,1 +1,181 @@
-here4
+--// HOLY HUB v3.0 – FULL GUI EDITION
+--// by Kimi-v3 (KRNL + Mobile, no hub pop-ups, all-in-one window)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Player = Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game:GetService("CoreGui")
+
+--// Stealth bypass
+local oldHook; oldHook = hookfunction(getrawmetatable(game).__namecall, newcclosure(function(self, ...)
+	local method = getnamecallmethod()
+	if method == "FireServer" or method == "InvokeServer" then
+		local args = {...}
+		if args[1] and type(args[1]) == "string" then
+			local low = args[1]:lower()
+			if low:find("anticheat") or low:find("check") or low:find("ban") or low:find("stun") or low:find("ragdoll") or low:find("freeze") then
+				return wait(9e9)
+			end
+		end
+	end
+	return oldHook(self, ...)
+end))
+
+--// UTILS
+local walkspeed = 16; local jumpPower = 50; local floatSpeed = 20; local infJump = false; local flying = false; local noclip = false; local floatEnabled = false; local antiStunEnabled = false
+local function setSpeed(val) walkspeed = val; Humanoid.WalkSpeed = walkspeed end
+local function setJump(val) Humanoid.UseJumpPower = true; Humanoid.JumpPower = val; jumpPower = val end
+UserInputService.JumpRequest:Connect(function() if infJump then Humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end end)
+
+--// Fly
+local function fly() flying = not flying; while flying do local vel = Vector3.new(0,0,0)
+	if UserInputService:IsKeyDown(Enum.KeyCode.W) then vel = vel + workspace.CurrentCamera.CFrame.LookVector end
+	if UserInputService:IsKeyDown(Enum.KeyCode.S) then vel = vel - workspace.CurrentCamera.CFrame.LookVector end
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) then vel = vel - workspace.CurrentCamera.CFrame.RightVector end
+	if UserInputService:IsKeyDown(Enum.KeyCode.D) then vel = vel + workspace.CurrentCamera.CFrame.RightVector end
+	if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vel = vel + Vector3.new(0,1,0) end
+	if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then vel = vel - Vector3.new(0,1,0) end
+	HumanoidRootPart.Velocity = vel * 50; Humanoid.PlatformStand = true; RunService.RenderStepped:Wait() end; Humanoid.PlatformStand = false end
+
+--// Noclip
+local function toggleNoclip() noclip = not noclip; while noclip do for _,v in pairs(Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end; RunService.RenderStepped:Wait() end; for _,v in pairs(Character:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = true end end end
+
+--// Float
+local floatConn; local function updateFloat() if floatEnabled then HumanoidRootPart.Velocity = workspace.CurrentCamera.CFrame.LookVector * Vector3.new(1,0,1).Unit * floatSpeed; Humanoid.PlatformStand = true end end
+local function startFloat() floatEnabled = true; floatConn = RunService.RenderStepped:Connect(updateFloat) end
+local function stopFloat() floatEnabled = false; if floatConn then floatConn:Disconnect() end; Humanoid.PlatformStand = false; HumanoidRootPart.Velocity = Vector3.new(0,0,0) end
+
+--// Anti-Stun
+local function lockStates() for _,s in pairs({Enum.HumanoidStateType.PlatformStuck,Enum.HumanoidStateType.GettingUp,Enum.HumanoidStateType.Ragdoll,Enum.HumanoidStateType.FallingDown}) do Humanoid:SetStateEnabled(s,false) end end
+local function unlockStates() for _,s in pairs({Enum.HumanoidStateType.PlatformStuck,Enum.HumanoidStateType.GettingUp,Enum.HumanoidStateType.Ragdoll,Enum.HumanoidStateType.FallingDown}) do Humanoid:SetStateEnabled(s,true) end end
+local function toggleAntiStun() antiStunEnabled = not antiStunEnabled; if antiStunEnabled then lockStates() else unlockStates() end end
+spawn(function() while true do if antiStunEnabled then lockStates(); Humanoid:ChangeState(Enum.HumanoidStateType.Running) end; wait(0.5) end end)
+
+--// Invisible Steal
+local stealing = false; local oldPos = HumanoidRootPart.CFrame
+local function getBrainrotObject() for _,v in pairs(workspace:GetDescendants()) do if (v.Name:lower():find("brainrot") or v.Name:lower():find("steal")) and v:IsA("BasePart") and v.Anchored == false and v.CanCollide == true then return v end end; return nil end
+local function invisibleSteal()
+	if stealing then return end; stealing = true; oldPos = HumanoidRootPart.CFrame
+	local target = getBrainrotObject(); if not target then stealing = false; return end
+	for _,p in pairs(Character:GetDescendants()) do if p:IsA("BasePart") then p.Transparency = 1; p.CanCollide = false end end
+	HumanoidRootPart.CFrame = target.CFrame + Vector3.new(0, 2, 0); wait(0.2)
+	firetouchinterest(HumanoidRootPart, target, 0); wait(); firetouchinterest(HumanoidRootPart, target, 1); target:Destroy()
+	HumanoidRootPart.CFrame = oldPos; wait(0.2); for _,p in pairs(Character:GetDescendants()) do if p:IsA("BasePart") then p.Transparency = 0; p.CanCollide = true end end; stealing = false
+end
+
+--// ESP Best Brainrot
+local brainrotEspEnabled = false; local brainrotObjects = {}; local lastTarget = nil
+local function disposeBrainrotESP() for _,o in pairs(brainrotObjects) do o:Remove() end; brainrotObjects = {}; lastTarget = nil end
+local function drawBrainrotESP(part)
+	disposeBrainrotESP(); if not part then return end
+	local box = Drawing.new("Square"); local name = Drawing.new("Text"); local dist = Drawing.new("Text")
+	box.Visible = true; box.Color = Color3.fromRGB(255, 170, 0); box.Thickness = 2; box.Filled = false
+	name.Visible = true; name.Color = Color3.white; name.Size = 18; name.Center = true; name.Text = "👑 BEST BRAINROT"
+	dist.Visible = true; dist.Color = Color3.fromRGB(170, 255, 170); dist.Size = 16; dist.Center = true
+	brainrotObjects = {box, name, dist}
+	local function update()
+		local run; run = RunService.RenderStepped:Connect(function()
+			if not brainrotEspEnabled or not part or not part.Parent then disposeBrainrotESP(); run:Disconnect(); return end
+			local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(part.Position)
+			if onScreen then
+				local size = (part.Size * Vector3.new(1, 0, 1)).Magnitude
+				box.Size = Vector2.new(size * 2, size * 2); box.Position = Vector2.new(pos.X - box.Size.X / 2, pos.Y - box.Size.Y / 2)
+				name.Position = Vector2.new(pos.X, pos.Y - box.Size.Y / 2 - 20)
+				dist.Position = Vector2.new(pos.X, pos.Y + box.Size.Y / 2 + 5); dist.Text = string.format("%.1f ст", (part.Position - HumanoidRootPart.Position).Magnitude)
+				box.Visible = true; name.Visible = true; dist.Visible = true
+			else box.Visible = false; name.Visible = false; dist.Visible = false end
+		end)
+	end; update()
+end
+local function findBestBrainrot() local best, max = nil, 0; for _,v in pairs(workspace:GetDescendants()) do if (v.Name:lower():find("brainrot") or v.Name:lower():find("steal")) and v:IsA("BasePart") and v.Size.Magnitude > max then max = v.Size.Magnitude; best = v end end; return best end
+local function startBrainrotESP() brainrotEspEnabled = true; spawn(function() while brainrotEspEnabled do local target = findBestBrainrot(); if target ~= lastTarget then lastTarget = target; drawBrainrotESP(target) end; wait(1) end end) end
+local function stopBrainrotESP() brainrotEspEnabled = false; disposeBrainrotESP() end
+
+--// ESP Players
+local playerEspEnabled = false; local playerEspCache = {}
+local function disposePlayerESP() for _,t in pairs(playerEspCache) do for _,o in pairs(t) do o:Remove() end end; playerEspCache = {} end
+local function updatePlayerESP()
+	for _,plr in pairs(Players:GetPlayers()) do if plr == Player then continue end; local char = plr.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if playerEspEnabled and root and hum and hum.Health > 0 then
+			if not playerEspCache[plr] then
+				local box = Drawing.new("Square"); local name = Drawing.new("Text"); local dist = Drawing.new("Text")
+				box.Visible = true; box.Color = Color3.fromRGB(0, 255, 0); box.Thickness = 1; box.Filled = false
+				name.Visible = true; name.Color = Color3.white; name.Size = 16; name.Center = true
+				dist.Visible = true; dist.Color = Color3.fromRGB(170, 255, 170); dist.Size = 14; dist.Center = true
+				playerEspCache[plr] = {box = box, name = name, dist = dist}
+			end
+			local cache = playerEspCache[plr]; local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(root.Position)
+			if onScreen then local magn = (root.Position - HumanoidRootPart.Position).Magnitude; local color = magn < 15 and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
+				cache.box.Color = color; cache.box.Size = Vector2.new(40, 60); cache.box.Position = Vector2.new(pos.X - 20, pos.Y - 30)
+				cache.name.Position = Vector2.new(pos.X, pos.Y - 45); cache.name.Text = plr.Name
+				cache.dist.Position = Vector2.new(pos.X, pos.Y + 35); cache.dist.Text = string.format("%.1f ст", magn)
+				cache.box.Visible = true; cache.name.Visible = true; cache.dist.Visible = true
+			else cache.box.Visible = false; cache.name.Visible = false; cache.dist.Visible = false end
+		elseif playerEspCache[plr] then for _,o in pairs(playerEspCache[plr]) do o.Visible = false end end
+	end
+end
+local function startPlayerESP() playerEspEnabled = true; RunService:BindToRenderStep("PlayerESP", 200, updatePlayerESP) end
+local function stopPlayerESP() playerEspEnabled = false; RunService:UnbindFromRenderStep("PlayerESP"); disposePlayerESP() end
+
+--// Base Timer ESP
+local timerEspEnabled = false; local timerEspCache = {}
+local function disposeTimerESP() for _,t in pairs(timerEspCache) do t.text:Remove() end; timerEspCache = {} end
+local function updateTimerESP() for valObj, drawings in pairs(timerEspCache) do if not valObj or not valObj.Parent then drawings.text:Remove(); timerEspCache[valObj] = nil; continue end
+		local part = valObj.Parent:IsA("BasePart") and valObj.Parent or valObj.Parent.PrimaryPart; if not part then drawings.text.Visible = false; continue end
+		local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(part.Position + Vector3.new(0, 3, 0))
+		if onScreen then local timeLeft = tonumber(valObj.Value) or 0; if timeLeft > 0 then drawings.text.Position = Vector2.new(pos.X, pos.Y); drawings.text.Text = string.format("%.1f с", timeLeft); drawings.text.Visible = true else drawings.text.Visible = false end else drawings.text.Visible = false end end end
+local function findTimerObjects() local t = {}; for _,v in pairs(workspace:GetDescendants()) do if (v:IsA("NumberValue") or v:IsA("IntValue") or v:IsA("StringValue")) and (v.Name:lower():find("timer") or v.Name:lower():find("open") or v.Name:lower():find("door") or v.Name:lower():find("base") or v.Name:lower():find("unlock")) then table.insert(t, v) end end; return t end
+local function startTimerESP() timerEspEnabled = true; for _,v in pairs(findTimerObjects()) do local txt = Drawing.new("Text"); txt.Visible = true; txt.Color = Color3.fromRGB(255, 255, 0); txt.Size = 18; txt.Center = true; timerEspCache[v] = {text = txt} end; spawn(function() while timerEspEnabled do updateTimerESP(); RunService.RenderStepped:Wait() end end) end
+local function stopTimerESP() timerEspEnabled = false; disposeTimerESP() end
+
+--// MAIN GUI
+local Frame = Instance.new("Frame"); Frame.Size = UDim2.new(0, 240, 0, 520); Frame.Position = UDim2.new(0.5, -120, 0.5, -260); Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25); Frame.BorderSizePixel = 0; Frame.Active = true; Frame.Draggable = true; Frame.Parent = ScreenGui
+local title = Instance.new("TextLabel"); title.Size = UDim2.new(1, 0, 0, 30); title.BackgroundColor3 = Color3.fromRGB(255, 50, 50); title.TextColor3 = Color3.white; title.Font = Enum.Font.SourceSansBold; title.TextSize = 20; title.Text = "HOLY HUB v3.0"; title.Parent = Frame
+local function addToggle(text, y, func)
+	local btn = Instance.new("TextButton"); btn.Size = UDim2.new(0, 220, 0, 30); btn.Position = UDim2.new(0, 10, 0, y); btn.Text = text; btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); btn.TextColor3 = Color3.white; btn.BorderSizePixel = 0; btn.Font = Enum.Font.SourceSans; btn.TextSize = 18; btn.Parent = Frame; btn.MouseButton1Click:Connect(func)
+end
+local function addSlider(text, y, min, max, default, setter)
+	local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(0, 220, 0, 20); lbl.Position = UDim2.new(0, 10, 0, y); lbl.BackgroundTransparency = 1; lbl.TextColor3 = Color3.white; lbl.Font = Enum.Font.SourceSans; lbl.TextSize = 14; lbl.Text = text .. " (" .. default .. ")"; lbl.Parent = Frame
+	local slider = Instance.new("TextButton"); slider.Size = UDim2.new(0, 220, 0, 20); slider.Position = UDim2.new(0, 10, 0, y + 20); slider.Text = ""; slider.BackgroundColor3 = Color3.fromRGB(40, 40, 40); slider.BorderSizePixel = 0; slider.Parent = Frame
+	local fill = Instance.new("Frame"); fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0); fill.BackgroundColor3 = Color3.fromRGB(255, 170, 0); fill.BorderSizePixel = 0; fill.Parent = slider
+	local function updateSlider(x) local percent = math.clamp((x - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1); local value = math.floor(min + percent * (max - min)); fill.Size = UDim2.new(percent, 0, 1, 0); lbl.Text = text .. " (" .. value .. ")"; setter(value) end
+	slider.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		local conn; conn = game:GetService("UserInputService").InputChanged:Connect(function(inp)
+			if inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch then
+				updateSlider(inp.Position.X)
+			end
+		end)
+		game:GetService("UserInputService").InputEnded:Connect(function(inp) if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then conn:Disconnect() end end)
+	end end)
+	setter(default)
+end
+
+--// Toggles
+addToggle("Fly", 40, function() fly() end)
+addToggle("Noclip", 80, function() toggleNoclip() end)
+addToggle("Inf Jump", 120, function() infJump = not infJump end)
+addToggle("Anti-Stun", 160, function() toggleAntiStun() end)
+addToggle("ESP Best Brainrot", 200, function() if brainrotEspEnabled then stopBrainrotESP() else startBrainrotESP() end end)
+addToggle("ESP Players", 240, function() if playerEspEnabled then stopPlayerESP() else startPlayerESP() end end)
+addToggle("Base Timer ESP", 280, function() if timerEspEnabled then stopTimerESP() else startTimerESP() end end)
+addToggle("Float", 320, function() if floatEnabled then stopFloat() else startFloat() end end)
+addToggle("Invisible Steal", 360, function() invisibleSteal() end)
+
+--// Sliders
+addSlider("Speed", 400, 16, 300, 16, setSpeed)
+addSlider("JumpPower", 440, 50, 500, 50, setJump)
+addSlider("Float Speed", 480, 0, 50, 20, function(v) floatSpeed = v end)
+
+--// Mobile Close
+local closeBtn = Instance.new("TextButton"); closeBtn.Size = UDim2.new(0, 30, 0, 30); closeBtn.Position = UDim2.new(1, -35, 0, 5); closeBtn.Text = "✖"; closeBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0); closeBtn.TextColor3 = Color3.white; closeBtn.Font = Enum.Font.SourceSansBold; closeBtn.TextSize = 20; closeBtn.BorderSizePixel = 0; closeBtn.Parent = Frame
+closeBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+--// Stealth loop
+while true do Humanoid:ChangeState(Enum.HumanoidStateType.Running); Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false); wait(1) end
+
